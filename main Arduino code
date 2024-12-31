@@ -1,0 +1,221 @@
+/*
+This code records the temperature through testing the mV put out by the sensor.
+It records in both Celcius and Fahrenheit. 
+It can only detect from -40 degrees C to 125 degrees C or -40 degrees F 
+to 257 degrees F
+The Humidity is simulated by a potentiometer by being mapped into percentages
+*/
+#include <LiquidCrystal.h>
+
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+int count = 0;
+
+const int analogIn = A0;
+int humiditysensorOutput = 0;
+int fsrAnalogPin = 2;
+int fsrReading;
+int LEDpin = 8; 
+int LEDbrightness;
+
+float Windspeedfloat = 0; // For Serial monitor output
+int Windspeedint = 0;	  // For LCD screen output
+int Windmax = 0;		  // Maximum Wind speed
+int Windmin = 0;		  // Minimum Wind speed
+int Tempmax = 0;		  // Maximum Temperature
+int Tempmin = 0;		  // Minimum Temperature
+
+// Defining Variables
+int RawValue= 0;
+double Voltage = 0;
+double tempC = 0;
+double tempF = 0;
+
+// Wind speed Average Variables
+const int numReadings1 = 3;      // Desired Average sample size
+int readings1[numReadings1];     // the readings from the analog input
+int readIndex1 = 0;              // the index of the current reading
+int total1 = 0;                  // the running total
+int average1 = 0;                // the average
+
+// Temperature Average Variables
+const int numReadings = 3;      // Desired Average sample size
+int readings[numReadings];      // the readings from the analog input
+int readIndex = 0;              // the index of the current reading
+int total = 0;                  // the running total
+int average = 0;                // the average
+
+void setup(){  
+  Serial.begin(9600);
+  pinMode(A1, INPUT);
+  pinMode(LEDpin, OUTPUT);
+  
+  for (int thisReading1 = 0; thisReading1 < numReadings1; thisReading1++) {
+    
+    readings1[thisReading1] = 0;}
+  
+  // set up the LCD's number of columns and rows:
+  lcd.begin(16, 2);
+
+}
+
+void loop(){
+  functionLooper();
+  delay(3000);  //iterate every 5 seconds
+  
+  lcd.clear();
+
+}
+
+
+void temp() {
+  RawValue = analogRead(analogIn);
+  Voltage = (RawValue / 1023.0) * 5000; // 5000 to get millivots.
+  tempC = (Voltage-500) * 0.1; // 500 is the offset
+  tempF = (tempC * 1.8) + 32; // convert to F  
+     
+  Serial.print("\t milli volts = ");
+  Serial.print(Voltage,0); //
+  Serial.print("\t Temperature in C = ");
+  Serial.print(tempC,1);
+  Serial.print("\t Temperature in F = ");
+  Serial.println(tempF,1);
+  
+  //lcd.print("Tmp: ");       // Print Temps: to the LCD 
+  lcd.print(tempF);      // Fahrenheit value
+  lcd.print("F ");		      // F symbol
+  lcd.print("| ");
+  lcd.print(tempC);	      // Celsius value
+  lcd.print("C");		      // C symbol
+  
+  delay(2000);
+}
+
+void humiditySen(){
+  humiditysensorOutput = analogRead(A1);
+  Serial.print("Humidity: "); // Printing out Humidity Percentage
+  Serial.print(map(humiditysensorOutput, 0, 1023, 10, 70));
+  Serial.println("%");
+  
+  //lcd.setCursor(6, 2);	      // adjust cursor
+    lcd.print("Humidity: ");
+  lcd.print(map(humiditysensorOutput, 0, 1023, 10, 70));
+  lcd.print("%");
+  delay(2000);
+}
+
+void pressurePa(){
+  //pressure is an indicator of weather. When a low-pressure 
+  //system moves into an area, 
+  //it usually leads to cloudiness, wind, and precipitation. 
+  //High-pressure systems usually lead to fair, calm weather.
+  
+  fsrReading = analogRead(fsrAnalogPin);
+  Serial.print("Analog reading (Pressure) = ");
+  Serial.println(fsrReading);
+  // we'll need to change the range from the analog reading (0-1023) down to the range
+  // used by analogWrite (0-255) with map!
+  LEDbrightness = map(fsrReading, 0, 1023, 0, 255);
+  // LED gets brighter the harder you press
+  analogWrite(LEDpin, LEDbrightness);
+  
+  lcd.print("PSS = ");
+  lcd.print(fsrReading);
+  lcd.print("Pa");
+  
+  delay(2000);
+}
+
+void windSpeed(){
+  float Voltage = analogRead(A0) * (5.0 / 1023.0);
+  // Voltage converted to MPH
+  int Windspeedint = (Voltage - 0.4) * 10 * 2.025 * 2.237;     // For LCD screen output
+  float Windspeedfloat = (Voltage - 0.4) * 10 * 2.025 * 2.237; // For Serial monitor output
+  // Wind speed Average
+  total1 = total1 - readings1[readIndex1]; // subtract the last reading
+  readings1[readIndex1] = Windspeedfloat;  // read from the sensor
+  total1 = total1 + readings1[readIndex1]; // add the reading to the total
+  readIndex1 = readIndex1 + 1;             // advance to the next position in the array
+  if (readIndex1 >= numReadings1) {        // if we're at the end of the array...
+    
+    readIndex1 = 0;}                       // ...wrap around to the beginning
+
+  average1 = total1 / numReadings1;        // calculate the average
+  
+  if (Voltage < 0.4){
+    
+    int average1 = 0;}
+  
+  // Wind speed Min/Max
+  
+  // Minimum
+  
+  if (readings[readIndex] == 0){			
+   
+    Windmin=999;}  
+ 
+  else if (readings1[readIndex1]<Windmin){
+  
+   Windmin=readings1[readIndex1];}
+	
+  // Maximum
+  
+  if (readings1[readIndex1]>Windmax){		// If new reading > old MAX reading...
+    
+    Windmax=readings1[readIndex1];}			// Set as new MAX
+
+  
+  //lcd.print("MPH");		      // MPH symbol
+  lcd.setCursor(0,0);	      // adjust cursor
+  if (Voltage < 0.4){         // If Voltage is less than 0.4...   
+    lcd.print("0");}     	  // print 0 to LCD
+  else {				      // Otherwise...
+    
+    lcd.print("Wind: ");
+    lcd.print(Windspeedint);} // Output Windspeed interger
+	lcd.print(" MPH");		      // MPH symbol
+
+  delay(2000);
+}
+
+void functionLooper(){
+  lcd.print("Starting...");
+  delay(1500);
+  lcd.clear();
+  
+  count++;
+  
+  if (count>=2) {
+    temp();
+    delay(1500);
+    lcd.clear();
+    count++;
+  }
+  
+  if (count>=3) {
+    windSpeed();
+    delay(1500);
+    lcd.clear();
+    count++;
+  }  
+  
+  if (count>=4) {
+    humiditySen();
+    delay(1500);
+    lcd.clear();
+    count++;
+  }
+  
+  if (count>=5) {
+    pressurePa();
+    delay(1500);
+    lcd.clear();
+    count++;
+  }
+  
+  if (count>=6) {
+    lcd.clear();
+    count=2; 
+  }
+
+  
+}
